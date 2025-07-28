@@ -75,6 +75,7 @@ def preprocess(image):
     return image
 
 
+# My note: LoraLoaderMixin is not used, but likely being included as the author experimented before finalize the model.
 class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMixin):
     r"""
     Args:

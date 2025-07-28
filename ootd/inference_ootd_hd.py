@@ -65,6 +65,7 @@ class OOTDiffusionHD:
             requires_safety_checker=False,
         ).to(self.gpu_id)
 
+        # My note: it is a new sampler and could be better than DDIM
         self.pipe.scheduler = UniPCMultistepScheduler.from_config(self.pipe.scheduler.config)
         
         self.auto_processor = AutoProcessor.from_pretrained(VIT_PATH)
