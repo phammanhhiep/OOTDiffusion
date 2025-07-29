@@ -24,10 +24,10 @@ import torch.nn.functional as F
 from transformers import AutoProcessor, CLIPVisionModelWithProjection
 from transformers import CLIPTextModel, CLIPTokenizer
 
-VIT_PATH = "../checkpoints/clip-vit-large-patch14"
-VAE_PATH = "../checkpoints/ootd"
-UNET_PATH = "../checkpoints/ootd/ootd_hd/checkpoint-36000"
-MODEL_PATH = "../checkpoints/ootd"
+VIT_PATH = "openai/clip-vit-large-patch14"
+VAE_PATH = "levihsu/OOTDiffusion"
+UNET_PATH = "levihsu/OOTDiffusion"
+MODEL_PATH = "levihsu/OOTDiffusion"
 
 class OOTDiffusionHD:
 
@@ -36,49 +36,48 @@ class OOTDiffusionHD:
 
         vae = AutoencoderKL.from_pretrained(
             VAE_PATH,
-            subfolder="vae",
+            subfolder="checkpoints/ootd/vae",
             torch_dtype=torch.float16,
         )
 
         unet_garm = UNetGarm2DConditionModel.from_pretrained(
             UNET_PATH,
-            subfolder="unet_garm",
+            subfolder="checkpoints/ootd/ootd_hd/checkpoint-36000/unet_garm",
             torch_dtype=torch.float16,
             use_safetensors=True,
         )
         unet_vton = UNetVton2DConditionModel.from_pretrained(
             UNET_PATH,
-            subfolder="unet_vton",
+            subfolder="checkpoints/ootd/ootd_hd/checkpoint-36000/unet_vton",
             torch_dtype=torch.float16,
             use_safetensors=True,
         )
-
-        self.pipe = OotdPipeline.from_pretrained(
-            MODEL_PATH,
-            unet_garm=unet_garm,
-            unet_vton=unet_vton,
-            vae=vae,
-            torch_dtype=torch.float16,
-            variant="fp16",
-            use_safetensors=True,
-            safety_checker=None,
-            requires_safety_checker=False,
-        ).to(self.gpu_id)
-
-        # My note: it is a new sampler and could be better than DDIM
-        self.pipe.scheduler = UniPCMultistepScheduler.from_config(self.pipe.scheduler.config)
-        
-        self.auto_processor = AutoProcessor.from_pretrained(VIT_PATH)
-        self.image_encoder = CLIPVisionModelWithProjection.from_pretrained(VIT_PATH).to(self.gpu_id)
 
         self.tokenizer = CLIPTokenizer.from_pretrained(
             MODEL_PATH,
-            subfolder="tokenizer",
+            subfolder="checkpoints/ootd/tokenizer",
         )
         self.text_encoder = CLIPTextModel.from_pretrained(
             MODEL_PATH,
-            subfolder="text_encoder",
+            subfolder="checkpoints/ootd/text_encoder",
+        ).to(self.gpu_id)        
+
+        self.pipe = OotdPipeline(
+            unet_garm=unet_garm,
+            unet_vton=unet_vton,
+            vae=vae,
+            tokenizer=self.tokenizer,
+            text_encoder=self.text_encoder,
+            scheduler=UniPCMultistepScheduler.from_pretrained(
+                MODEL_PATH, 
+                subfolder="checkpoints/ootd/scheduler"
+            ),
+            safety_checker=None, # Explicitly pass None
+            feature_extractor=None # Explicitly pass None            
         ).to(self.gpu_id)
+        
+        self.auto_processor = AutoProcessor.from_pretrained(VIT_PATH)
+        self.image_encoder = CLIPVisionModelWithProjection.from_pretrained(VIT_PATH).to(self.gpu_id)
 
 
     def tokenize_captions(self, captions, max_length):
